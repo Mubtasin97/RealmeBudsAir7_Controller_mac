@@ -12,6 +12,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize Menu Bar controller
         statusBarController = StatusBarController()
 
+        // Initialize Bluetooth Service & detect paired earbuds
+        _ = RealmeBluetoothService.shared
+        RealmeBluetoothService.shared.detectPairedBuds()
+        if AppState.shared.autoConnectOnLaunch {
+            RealmeBluetoothService.shared.discoverServicesAndConnect()
+        }
+
         print("[RealmeBudsController] Application initialized successfully.")
 
         // Support CLI flags for automation and preview inspection

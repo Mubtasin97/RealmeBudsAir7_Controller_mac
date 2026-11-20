@@ -41,15 +41,15 @@ public final class AppState: ObservableObject {
     @Published public var firmwareVersion: String = "1.1.0.66"
     @Published public var hardwareRevision: String = "0x064812"
     @Published public var bluetoothSoC: String = "Bestechnic BES2700YP"
-    @Published public var isConnected: Bool = true
+    @Published public var isConnected: Bool = false
     @Published public var rfcommChannel: Int = 15
     @Published public var rfcommServiceName: String = "oppointeraction"
     @Published public var serviceUUID: String = "0000079A-D102-11E1-9B23-00025B00A5A5"
-    @Published public var linkStatusText: String = "Connected · RFCOMM Ch 15"
+    @Published public var linkStatusText: String = "Disconnected"
     @Published public var rssi: Int = -52 // dBm
     @Published public var activeCodec: String = "AAC-LC (48 kHz / 24-bit)"
-    @Published public var txPacketsCount: Int = 142
-    @Published public var rxPacketsCount: Int = 589
+    @Published public var txPacketsCount: Int = 0
+    @Published public var rxPacketsCount: Int = 0
     @Published public var packetDropCount: Int = 0
 
     // MARK: - Battery Telemetry
@@ -140,47 +140,7 @@ public final class AppState: ObservableObject {
             DiagnosticEntry(
                 level: .info,
                 category: "SYSTEM",
-                message: "Realme Buds Controller launched on macOS 27.2 (Apple Silicon arm64)"
-            ),
-            DiagnosticEntry(
-                level: .info,
-                category: "BLE",
-                message: "SDP record resolved: 'oppointeraction' on RFCOMM channel 15"
-            ),
-            DiagnosticEntry(
-                level: .tx,
-                category: "RFCOMM",
-                message: "Handshake session init opcode 0x0100",
-                hexData: "AA 07 00 00 00 01 01 00 00"
-            ),
-            DiagnosticEntry(
-                level: .rx,
-                category: "RFCOMM",
-                message: "Handshake acknowledged (0x8100 status 0x00 OK)",
-                hexData: "AA 07 00 00 00 81 01 00 00"
-            ),
-            DiagnosticEntry(
-                level: .rx,
-                category: "BATTERY",
-                message: "Telemetry: Left 85%, Right 90%, Case 65% (charging on AC pins)",
-                hexData: "AA 0D 00 00 06 81 02 06 00 00 03 01 55 02 5A 03 C1"
-            ),
-            DiagnosticEntry(
-                level: .rx,
-                category: "ANC",
-                message: "Noise mode reported: ANC Smart / Adaptive (0x20)",
-                hexData: "AA 0A 00 00 0C 81 03 03 00 01 01 20"
-            ),
-            DiagnosticEntry(
-                level: .rx,
-                category: "MULTI_CONNECT",
-                message: "Multi-connect table sync: Slot 1 (This Mac), Slot 2 (iPhone 16 Pro)",
-                hexData: "AA 20 00 00 12 81 04 18 00 00 02 01 F4 D4 88 AA 11 01 01 ..."
-            ),
-            DiagnosticEntry(
-                level: .info,
-                category: "CODEC",
-                message: "Audio streaming active: AAC-LC Stereo 48.0 kHz. LHDC enabled on firmware"
+                message: "Realme Buds Controller initialized. Ready for Bluetooth Classic RFCOMM communication."
             )
         ]
     }
@@ -278,6 +238,7 @@ public final class AppState: ObservableObject {
         if diagnosticLogs.count > 150 {
             diagnosticLogs.removeLast()
         }
+        print("[\(entry.formattedTime)] [\(level.rawValue)] [\(category)] \(message)\(hexData != nil ? " | Hex: \(hexData!)" : "")")
     }
 
     public func clearLogs() {
