@@ -29,7 +29,7 @@ public enum AppAppearance: String, CaseIterable, Identifiable, Sendable {
 public final class AppearanceManager: ObservableObject {
     public static let shared = AppearanceManager()
 
-    private let defaultsKey = "app_appearance_preference"
+    private let defaultsKey = "rbc_app_appearance_mode"
 
     @Published public var currentPreference: AppAppearance {
         didSet {
@@ -46,10 +46,44 @@ public final class AppearanceManager: ObservableObject {
         }
     }
 
+    /// Returns the effective icon to show in the header button (Sun for Light, Moon for Dark)
+    public var headerButtonIconName: String {
+        switch currentPreference {
+        case .light:
+            return "sun.max.fill"
+        case .dark:
+            return "moon.stars.fill"
+        case .system:
+            // Check current effective system appearance
+            let isDark = NSApp?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            return isDark ? "moon.stars.fill" : "sun.max.fill"
+        }
+    }
+
+    public var headerButtonTooltip: String {
+        switch currentPreference {
+        case .light:
+            return "Current: Light Mode. Click to switch to Dark Mode."
+        case .dark:
+            return "Current: Dark Mode. Click to switch to Light Mode."
+        case .system:
+            return "Current: System Mode. Click to switch appearance."
+        }
+    }
+
     private init() {
         let savedRaw = UserDefaults.standard.string(forKey: defaultsKey) ?? AppAppearance.system.rawValue
         self.currentPreference = AppAppearance(rawValue: savedRaw) ?? .system
         applyAppearance()
+    }
+
+    /// Toggle between Light and Dark mode from the header button
+    public func toggleLightDark() {
+        if currentPreference == .light {
+            currentPreference = .dark
+        } else {
+            currentPreference = .light
+        }
     }
 
     public func applyAppearance() {

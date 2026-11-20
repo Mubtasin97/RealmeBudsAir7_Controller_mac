@@ -21,7 +21,7 @@ public enum NavigationSection: String, CaseIterable, Identifiable, Sendable {
     public var sfSymbol: String {
         switch self {
         case .overview: "headphones"
-        case .devices: "laptopcomputer.and.iphone"
+        case .devices: "rectangle.2.swap"
         case .settings: "slider.horizontal.3"
         case .diagnostics: "waveform.path.ecg"
         }
@@ -35,65 +35,101 @@ public final class AppState: ObservableObject {
     // Active Navigation in Popover
     @Published public var activeSection: NavigationSection = .overview
 
-    // Device Identification & Link State
+    // MARK: - Device Info & Link Status
     @Published public var deviceName: String = "Realme Buds Air 7"
+    @Published public var deviceModelCode: String = "RMA2401"
     @Published public var firmwareVersion: String = "1.1.0.66"
+    @Published public var hardwareRevision: String = "0x064812"
+    @Published public var bluetoothSoC: String = "Bestechnic BES2700YP"
     @Published public var isConnected: Bool = true
-    @Published public var linkStatusText: String = "Connected (RFCOMM Ch 15)"
+    @Published public var rfcommChannel: Int = 15
+    @Published public var rfcommServiceName: String = "oppointeraction"
+    @Published public var serviceUUID: String = "0000079A-D102-11E1-9B23-00025B00A5A5"
+    @Published public var linkStatusText: String = "Connected · RFCOMM Ch 15"
     @Published public var rssi: Int = -52 // dBm
+    @Published public var activeCodec: String = "AAC-LC (48 kHz / 24-bit)"
+    @Published public var txPacketsCount: Int = 142
+    @Published public var rxPacketsCount: Int = 589
+    @Published public var packetDropCount: Int = 0
 
-    // Battery Telemetry
+    // MARK: - Battery Telemetry
     @Published public var leftBattery: BatteryStatus = BatteryStatus(percentage: 85, isCharging: false)
     @Published public var rightBattery: BatteryStatus = BatteryStatus(percentage: 90, isCharging: false)
     @Published public var caseBattery: BatteryStatus = BatteryStatus(percentage: 65, isCharging: true)
 
-    // Noise Control
+    // MARK: - Noise Control
     @Published public var noiseControlMode: NoiseControlMode = .anc(.smart)
 
-    // Quick Switches
+    // MARK: - Quick Hardware Switches
     @Published public var isGameModeEnabled: Bool = false
+    @Published public var isHiResLhdcEnabled: Bool = true
     @Published public var isDualConnectionEnabled: Bool = true
     @Published public var isSpatialAudioEnabled: Bool = true
-    @Published public var isHiResLhdcEnabled: Bool = true
     @Published public var isInEarDetectionEnabled: Bool = true
     @Published public var isWindNoiseReductionEnabled: Bool = true
     @Published public var isDynamicBassEnabled: Bool = true
 
-    // Equalizer
-    @Published public var activeEqPreset: EqualizerPreset = .original
+    // MARK: - Equalizer
+    @Published public var activeEqPreset: EqualizerPreset = .original {
+        didSet {
+            currentEqBands = activeEqPreset.defaultBands
+        }
+    }
+    @Published public var currentEqBands: [EqualizerBand] = EqualizerPreset.original.defaultBands
 
-    // Remembered Devices
+    // MARK: - Connected & Remembered Devices (Dual Connection)
     @Published public var rememberedDevices: [PairedDevice] = [
         PairedDevice(
             name: "MacBook Pro (This Mac)",
             macAddress: "F4:D4:88:AA:11:01",
-            isConnected: true,
+            connectionState: .connected,
+            slotNumber: 1,
             isThisMac: true,
-            iconName: "laptopcomputer"
+            iconName: "laptopcomputer",
+            lastConnectedTime: "Primary Host (Active)"
         ),
         PairedDevice(
             name: "Protik's iPhone 16 Pro",
             macAddress: "DC:A9:04:88:33:22",
-            isConnected: true,
+            connectionState: .connected,
+            slotNumber: 2,
             isThisMac: false,
-            iconName: "iphone"
+            iconName: "iphone",
+            lastConnectedTime: "Secondary Host (Active)"
         ),
         PairedDevice(
             name: "iPad Air 5",
             macAddress: "A0:C9:A0:55:77:88",
-            isConnected: false,
+            connectionState: .disconnected,
+            slotNumber: nil,
             isThisMac: false,
-            iconName: "ipad"
+            iconName: "ipad",
+            lastConnectedTime: "Yesterday at 18:42"
+        ),
+        PairedDevice(
+            name: "ThinkPad X1 Carbon",
+            macAddress: "50:EB:71:34:99:A0",
+            connectionState: .disconnected,
+            slotNumber: nil,
+            isThisMac: false,
+            iconName: "desktopcomputer",
+            lastConnectedTime: "3 days ago"
         )
     ]
 
-    // Diagnostics Telemetry Log
-    @Published public var diagnosticLogs: [DiagnosticEntry] = []
-
-    // Connection Preferences
+    // MARK: - Settings: Preferences
     @Published public var autoConnectOnLaunch: Bool = true
     @Published public var autoReconnectOnDisconnect: Bool = true
     @Published public var launchAtLogin: Bool = false
+
+    // Settings: Notifications
+    @Published public var enableNotifications: Bool = true
+    @Published public var notifyLowBattery: Bool = true
+    @Published public var notifyDeviceSwitched: Bool = true
+    @Published public var notifyChargingCompleted: Bool = false
+
+    // MARK: - Diagnostics Telemetry Log
+    @Published public var diagnosticLogs: [DiagnosticEntry] = []
 
     private init() {
         populateInitialDiagnosticLogs()
@@ -103,87 +139,143 @@ public final class AppState: ObservableObject {
         diagnosticLogs = [
             DiagnosticEntry(
                 level: .info,
-                category: "INIT",
-                message: "Realme Buds Controller initialized (macOS 27.2 / arm64)"
+                category: "SYSTEM",
+                message: "Realme Buds Controller launched on macOS 27.2 (Apple Silicon arm64)"
+            ),
+            DiagnosticEntry(
+                level: .info,
+                category: "BLE",
+                message: "SDP record resolved: 'oppointeraction' on RFCOMM channel 15"
             ),
             DiagnosticEntry(
                 level: .tx,
                 category: "RFCOMM",
-                message: "Handshake opcode 0x0100 dispatched to Channel 15",
+                message: "Handshake session init opcode 0x0100",
                 hexData: "AA 07 00 00 00 01 01 00 00"
             ),
             DiagnosticEntry(
                 level: .rx,
                 category: "RFCOMM",
-                message: "Handshake ACK received from Buds Air 7",
+                message: "Handshake acknowledged (0x8100 status 0x00 OK)",
                 hexData: "AA 07 00 00 00 81 01 00 00"
             ),
             DiagnosticEntry(
                 level: .rx,
                 category: "BATTERY",
-                message: "Battery status update: L=85%, R=90%, Case=65% (charging)",
+                message: "Telemetry: Left 85%, Right 90%, Case 65% (charging on AC pins)",
                 hexData: "AA 0D 00 00 06 81 02 06 00 00 03 01 55 02 5A 03 C1"
             ),
             DiagnosticEntry(
                 level: .rx,
                 category: "ANC",
-                message: "Current noise mode: ANC Smart (0x20)",
+                message: "Noise mode reported: ANC Smart / Adaptive (0x20)",
                 hexData: "AA 0A 00 00 0C 81 03 03 00 01 01 20"
+            ),
+            DiagnosticEntry(
+                level: .rx,
+                category: "MULTI_CONNECT",
+                message: "Multi-connect table sync: Slot 1 (This Mac), Slot 2 (iPhone 16 Pro)",
+                hexData: "AA 20 00 00 12 81 04 18 00 00 02 01 F4 D4 88 AA 11 01 01 ..."
+            ),
+            DiagnosticEntry(
+                level: .info,
+                category: "CODEC",
+                message: "Audio streaming active: AAC-LC Stereo 48.0 kHz. LHDC enabled on firmware"
             )
         ]
     }
 
+    // MARK: - Actions
+
     public func setNoiseMode(_ mode: NoiseControlMode) {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(Theme.quickAnimation) {
             noiseControlMode = mode
         }
         appendLog(
             level: .tx,
             category: "ANC",
-            message: "Noise mode switched to \(mode.title)"
+            message: "Noise control command 0x0404 dispatched: \(mode.title)"
         )
     }
 
     public func toggleGameMode() {
-        withAnimation(.easeInOut(duration: 0.2)) {
+        withAnimation(Theme.quickAnimation) {
             isGameModeEnabled.toggle()
         }
         appendLog(
             level: .tx,
             category: "GAME_MODE",
-            message: "Game mode toggled to \(isGameModeEnabled ? "ON" : "OFF")"
+            message: "Game mode 0x0403 [0x06] updated to \(isGameModeEnabled ? "ENABLED (45ms)" : "DISABLED")"
+        )
+    }
+
+    public func toggleLhdc() {
+        withAnimation(Theme.quickAnimation) {
+            isHiResLhdcEnabled.toggle()
+        }
+        appendLog(
+            level: .tx,
+            category: "LHDC",
+            message: "High-Res audio switch 0x0403 [0x18] updated to \(isHiResLhdcEnabled ? "ENABLED" : "DISABLED")"
         )
     }
 
     public func toggleDeviceConnection(for device: PairedDevice) {
         guard let index = rememberedDevices.firstIndex(where: { $0.id == device.id }) else { return }
 
-        // If trying to connect a third device while 2 are connected
         let activeCount = rememberedDevices.filter(\.isConnected).count
         if !device.isConnected && activeCount >= 2 {
             appendLog(
                 level: .warn,
                 category: "MULTI_CONNECT",
-                message: "Max 2 active devices reached. Disconnect an existing device first to switch."
+                message: "Multi-connect limit: Both hardware slots are occupied. Pick a device to disconnect first."
             )
             return
         }
 
-        withAnimation(.easeInOut(duration: 0.2)) {
-            rememberedDevices[index].isConnected.toggle()
+        withAnimation(Theme.quickAnimation) {
+            if rememberedDevices[index].isConnected {
+                rememberedDevices[index].connectionState = .disconnected
+                rememberedDevices[index].slotNumber = nil
+            } else {
+                rememberedDevices[index].connectionState = .connected
+                let takenSlots = Set(rememberedDevices.compactMap(\.slotNumber))
+                rememberedDevices[index].slotNumber = takenSlots.contains(1) ? 2 : 1
+            }
         }
 
         appendLog(
             level: .tx,
             category: "MULTI_CONNECT",
-            message: "\(device.name) connection state changed to \(rememberedDevices[index].isConnected ? "Connected" : "Disconnected")"
+            message: "0x040B operateMultiConnect sent for '\(device.name)': \(rememberedDevices[index].connectionState.rawValue)"
+        )
+    }
+
+    public func swapDevice(disconnecting oldDevice: PairedDevice, connecting newDevice: PairedDevice) {
+        guard let oldIdx = rememberedDevices.firstIndex(where: { $0.id == oldDevice.id }),
+              let newIdx = rememberedDevices.firstIndex(where: { $0.id == newDevice.id }) else { return }
+
+        let slot = rememberedDevices[oldIdx].slotNumber ?? 2
+
+        withAnimation(Theme.quickAnimation) {
+            rememberedDevices[oldIdx].connectionState = .disconnected
+            rememberedDevices[oldIdx].slotNumber = nil
+
+            rememberedDevices[newIdx].connectionState = .connected
+            rememberedDevices[newIdx].slotNumber = slot
+        }
+
+        appendLog(
+            level: .tx,
+            category: "MULTI_CONNECT",
+            message: "Swapped Slot \(slot): Disconnected '\(oldDevice.name)', connected '\(newDevice.name)'"
         )
     }
 
     public func appendLog(level: DiagnosticLevel, category: String, message: String, hexData: String? = nil) {
         let entry = DiagnosticEntry(level: level, category: category, message: message, hexData: hexData)
         diagnosticLogs.insert(entry, at: 0)
-        if diagnosticLogs.count > 100 {
+        if diagnosticLogs.count > 150 {
             diagnosticLogs.removeLast()
         }
     }

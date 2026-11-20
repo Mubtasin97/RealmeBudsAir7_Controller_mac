@@ -5,90 +5,100 @@ public struct PopoverRootView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     public let onOpenSettingsWindow: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
+
     public init(onOpenSettingsWindow: @escaping () -> Void) {
         self.onOpenSettingsWindow = onOpenSettingsWindow
     }
 
     public var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            headerBar
-                .padding(.horizontal, 14)
-                .padding(.top, 12)
-                .padding(.bottom, 10)
+        GlassEffectContainer {
+            VStack(spacing: 0) {
+                // Header Bar
+                headerBar
+                    .padding(.horizontal, 14)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
 
-            Divider()
+                Divider()
 
-            // Main Content Area
-            ScrollView {
-                VStack(spacing: 12) {
-                    switch appState.activeSection {
-                    case .overview:
-                        OverviewSectionView(appState: appState, onOpenSettings: onOpenSettingsWindow)
-                    case .devices:
-                        ConnectedDevicesSectionView(appState: appState)
-                    case .settings:
-                        inlineSettingsView
-                    case .diagnostics:
-                        DiagnosticsSectionView(appState: appState)
+                // Scrollable Content Area
+                ScrollView {
+                    VStack(spacing: 12) {
+                        switch appState.activeSection {
+                        case .overview:
+                            OverviewSectionView(appState: appState, onOpenSettings: onOpenSettingsWindow)
+                        case .devices:
+                            ConnectedDevicesSectionView(appState: appState)
+                        case .settings:
+                            inlineSettingsView
+                        case .diagnostics:
+                            DiagnosticsSectionView(appState: appState)
+                        }
                     }
+                    .padding(14)
                 }
-                .padding(14)
+
+                Divider()
+
+                // Footer Bar
+                footerBar
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
             }
-
-            Divider()
-
-            // Footer
-            footerBar
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
         }
-        .frame(width: 330, height: 490)
+        .frame(width: 340, height: 500)
         .preferredColorScheme(appearanceManager.colorSchemeOverride)
     }
 
-    // MARK: - Header
+    // MARK: - Header Bar
     private var headerBar: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 9) {
             HStack(alignment: .center) {
-                HStack(spacing: 6) {
+                HStack(spacing: 7) {
                     Image(systemName: "headphones")
-                        .font(.system(size: 13, weight: .bold))
+                        .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.accent)
                     Text("Realme Buds")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(.primary)
                 }
 
                 Spacer()
 
-                // Header Appearance Toggle (System -> Light -> Dark -> System)
+                // Dedicated Visible Appearance Button (Sun in Light, Moon in Dark)
                 Button {
-                    cycleAppearance()
+                    withAnimation(Theme.quickAnimation) {
+                        appearanceManager.toggleLightDark()
+                    }
                 } label: {
-                    Image(systemName: appearanceManager.currentPreference.iconName)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(Theme.accent)
-                        .frame(width: 24, height: 24)
-                        .background(Circle().fill(Color.primary.opacity(0.06)))
+                    HStack(spacing: 4) {
+                        Image(systemName: appearanceManager.headerButtonIconName)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Theme.accent)
+                    }
+                    .frame(width: 26, height: 26)
+                    .background(Circle().fill(Color.primary.opacity(0.06)))
+                    .overlay(Circle().strokeBorder(Color.white.opacity(0.1), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
-                .help("Color Theme: \(appearanceManager.currentPreference.title) (Click to cycle)")
+                .help(appearanceManager.headerButtonTooltip)
 
-                // Quit Menu Button
+                // Quit Button
                 Button {
                     NSApp.terminate(nil)
                 } label: {
                     Image(systemName: "power")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(.secondary)
-                        .frame(width: 24, height: 24)
+                        .frame(width: 26, height: 26)
                         .background(Circle().fill(Color.primary.opacity(0.06)))
                 }
                 .buttonStyle(.plain)
                 .help("Quit Realme Buds Controller")
             }
 
-            // Section Switcher Segment
+            // Section Switcher Segmented Pills
             HStack(spacing: 4) {
                 ForEach(NavigationSection.allCases) { section in
                     sectionPill(section: section)
@@ -101,7 +111,7 @@ public struct PopoverRootView: View {
     private func sectionPill(section: NavigationSection) -> some View {
         let isSelected = appState.activeSection == section
         Button {
-            withAnimation(.easeInOut(duration: 0.15)) {
+            withAnimation(Theme.quickAnimation) {
                 appState.activeSection = section
             }
         } label: {
@@ -109,7 +119,7 @@ public struct PopoverRootView: View {
                 Image(systemName: section.sfSymbol)
                     .font(.system(size: 10, weight: .semibold))
                 Text(section.title)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 5)
@@ -118,13 +128,33 @@ public struct PopoverRootView: View {
                     .fill(isSelected ? Theme.accent : Color.primary.opacity(0.04))
             )
             .foregroundStyle(isSelected ? Color.white : Color.secondary)
+            .overlay(
+                Capsule(style: .continuous)
+                    .strokeBorder(isSelected ? Color.white.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Inline Settings View (Quick access in Popover)
+    // MARK: - Inline Settings View (Quick Popover Access)
     private var inlineSettingsView: some View {
         VStack(spacing: 12) {
+            // Appearance Mode Selector Card
+            LiquidGlassCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    LiquidGlassSectionHeader(title: "Appearance Mode", icon: "circle.lefthalf.filled")
+
+                    Picker("Mode", selection: $appearanceManager.currentPreference) {
+                        ForEach(AppAppearance.allCases) { mode in
+                            Label(mode.title, systemImage: mode.iconName)
+                                .tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                }
+            }
+
+            // Quick EQ Preset Selector Card
             LiquidGlassCard {
                 VStack(alignment: .leading, spacing: 10) {
                     LiquidGlassSectionHeader(title: "Equalizer Preset", icon: "waveform")
@@ -134,13 +164,22 @@ public struct PopoverRootView: View {
                             Button {
                                 appState.activeEqPreset = preset
                             } label: {
-                                HStack {
+                                HStack(spacing: 8) {
                                     Image(systemName: preset.sfSymbol)
                                         .font(.system(size: 12))
-                                        .frame(width: 20)
-                                    Text(preset.title)
-                                        .font(.system(size: 11, weight: .medium))
+                                        .frame(width: 18)
+                                        .foregroundStyle(appState.activeEqPreset == preset ? Theme.accent : .secondary)
+
+                                    VStack(alignment: .leading, spacing: 1) {
+                                        Text(preset.title)
+                                            .font(.system(size: 11, weight: .medium))
+                                        Text(preset.descriptionText)
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(.secondary)
+                                    }
+
                                     Spacer()
+
                                     if appState.activeEqPreset == preset {
                                         Image(systemName: "checkmark")
                                             .font(.system(size: 10, weight: .bold))
@@ -148,7 +187,7 @@ public struct PopoverRootView: View {
                                     }
                                 }
                                 .padding(.horizontal, 8)
-                                .padding(.vertical, 6)
+                                .padding(.vertical, 5)
                                 .background(
                                     RoundedRectangle(cornerRadius: 6)
                                         .fill(appState.activeEqPreset == preset ? Theme.accentSubtle : Color.clear)
@@ -160,21 +199,22 @@ public struct PopoverRootView: View {
                 }
             }
 
+            // Connection & Notifications Card
             LiquidGlassCard {
                 VStack(alignment: .leading, spacing: 10) {
-                    LiquidGlassSectionHeader(title: "Preferences", icon: "slider.horizontal.3")
+                    LiquidGlassSectionHeader(title: "Quick Behaviors", icon: "gearshape")
 
-                    Toggle("In-Ear Detection", isOn: $appState.isInEarDetectionEnabled)
+                    Toggle("Auto-Reconnect on Wake", isOn: $appState.autoReconnectOnDisconnect)
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .tint(Theme.accent)
 
-                    Toggle("High-Res Audio (LHDC)", isOn: $appState.isHiResLhdcEnabled)
+                    Toggle("In-Ear Detection (Auto-Pause)", isOn: $appState.isInEarDetectionEnabled)
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .tint(Theme.accent)
 
-                    Toggle("Wind Noise Reduction", isOn: $appState.isWindNoiseReductionEnabled)
+                    Toggle("System Notifications", isOn: $appState.enableNotifications)
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .tint(Theme.accent)
@@ -182,6 +222,7 @@ public struct PopoverRootView: View {
                 .font(.system(size: 11))
             }
 
+            // Open Separate Settings Window Button
             Button(action: onOpenSettingsWindow) {
                 HStack(spacing: 6) {
                     Image(systemName: "macwindow")
@@ -200,32 +241,26 @@ public struct PopoverRootView: View {
         }
     }
 
-    // MARK: - Footer
+    // MARK: - Footer Bar
     private var footerBar: some View {
         HStack {
-            Text(appState.isConnected ? "● Online" : "○ Disconnected")
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(appState.isConnected ? Theme.success : .secondary)
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(appState.isConnected ? Theme.success : Theme.error)
+                    .frame(width: 6, height: 6)
+                Text(appState.isConnected ? "Online (Dual Connection)" : "Offline")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
 
             Spacer()
 
-            Button("Settings…") {
+            Button("Settings Window…") {
                 onOpenSettingsWindow()
             }
             .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(.secondary)
+            .foregroundStyle(Theme.accent)
             .buttonStyle(.plain)
-        }
-    }
-
-    private func cycleAppearance() {
-        switch appearanceManager.currentPreference {
-        case .system:
-            appearanceManager.currentPreference = .light
-        case .light:
-            appearanceManager.currentPreference = .dark
-        case .dark:
-            appearanceManager.currentPreference = .system
         }
     }
 }

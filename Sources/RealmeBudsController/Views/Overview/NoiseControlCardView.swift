@@ -3,16 +3,19 @@ import SwiftUI
 public struct NoiseControlCardView: View {
     @ObservedObject var appState: AppState
 
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
     public var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             LiquidGlassSectionHeader(
                 title: "Noise Control",
                 icon: "waveform.slash"
             )
 
             // Primary 3 Modes
-            HStack(spacing: 6) {
-                modeButton(
+            HStack(spacing: 8) {
+                primaryModeButton(
                     title: "Off",
                     icon: "circle.slash",
                     isSelected: isOff
@@ -20,7 +23,7 @@ public struct NoiseControlCardView: View {
                     appState.setNoiseMode(.off)
                 }
 
-                modeButton(
+                primaryModeButton(
                     title: "Transparency",
                     icon: "ear.and.waveform",
                     isSelected: isTransparency
@@ -28,7 +31,7 @@ public struct NoiseControlCardView: View {
                     appState.setNoiseMode(.transparency)
                 }
 
-                modeButton(
+                primaryModeButton(
                     title: "Noise Cancelling",
                     icon: "waveform.slash",
                     isSelected: isAnc
@@ -42,19 +45,27 @@ public struct NoiseControlCardView: View {
             // ANC Strength sub-levels (only shown when ANC is active)
             if isAnc {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("CANCELLATION STRENGTH")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 2)
+                    HStack {
+                        Text("CANCELLATION INTENSITY")
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        if let strength = currentStrength {
+                            Text(strength.title)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(Theme.accent)
+                        }
+                    }
+                    .padding(.horizontal, 2)
 
-                    HStack(spacing: 4) {
+                    HStack(spacing: 6) {
                         ForEach(ANCStrength.allCases) { strength in
-                            strengthButton(strength: strength)
+                            strengthPill(strength: strength)
                         }
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
-                .padding(.top, 4)
+                .padding(.top, 2)
             }
         }
     }
@@ -82,38 +93,44 @@ public struct NoiseControlCardView: View {
     }
 
     @ViewBuilder
-    private func modeButton(
+    private func primaryModeButton(
         title: String,
         icon: String,
         isSelected: Bool,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            VStack(spacing: 5) {
+            VStack(spacing: 6) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                 Text(title)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
+            .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: Theme.radiusSmall, style: .continuous)
-                    .fill(isSelected ? Theme.accent : Color.primary.opacity(0.05))
+                    .fill(isSelected ? Theme.accent : (colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.04)))
             )
             .foregroundStyle(isSelected ? Color.white : Color.primary)
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.radiusSmall, style: .continuous)
-                    .strokeBorder(isSelected ? Color.white.opacity(0.25) : Color.white.opacity(0.08), lineWidth: 1)
+                    .strokeBorder(
+                        isSelected
+                            ? Color.white.opacity(0.28)
+                            : (colorSchemeContrast == .increased ? Color.primary.opacity(0.2) : Color.white.opacity(0.08)),
+                        lineWidth: 1
+                    )
             )
+            .shadow(color: isSelected ? Theme.accentGlow : Color.clear, radius: 6, x: 0, y: 2)
         }
         .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private func strengthButton(strength: ANCStrength) -> some View {
+    private func strengthPill(strength: ANCStrength) -> some View {
         let isSelected = currentStrength == strength
         Button {
             appState.setNoiseMode(.anc(strength))
@@ -122,18 +139,23 @@ public struct NoiseControlCardView: View {
                 Image(systemName: strength.sfSymbol)
                     .font(.system(size: 9, weight: .semibold))
                 Text(strength.title)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.system(size: 10, weight: isSelected ? .bold : .medium))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 5)
+            .padding(.vertical, 6)
             .background(
                 Capsule(style: .continuous)
-                    .fill(isSelected ? Theme.accent.opacity(0.85) : Color.primary.opacity(0.04))
+                    .fill(isSelected ? Theme.accent.opacity(0.9) : (colorScheme == .dark ? Color.white.opacity(0.05) : Color.black.opacity(0.04)))
             )
             .foregroundStyle(isSelected ? Color.white : Color.secondary)
             .overlay(
                 Capsule(style: .continuous)
-                    .strokeBorder(isSelected ? Color.white.opacity(0.3) : Color.clear, lineWidth: 1)
+                    .strokeBorder(
+                        isSelected
+                            ? Color.white.opacity(0.35)
+                            : (colorSchemeContrast == .increased ? Color.primary.opacity(0.2) : Color.clear),
+                        lineWidth: 1
+                    )
             )
         }
         .buttonStyle(.plain)
