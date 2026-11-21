@@ -39,7 +39,6 @@ public struct LiquidGlassCard<Content: View>: View {
             // Translucent Liquid Glass Surface
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .glassEffect(.regular)
                 .overlay(
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .strokeBorder(

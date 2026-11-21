@@ -22,6 +22,7 @@ public struct NoiseControlCardView: View {
                 ) {
                     appState.setNoiseMode(.off)
                 }
+                .disabled(appState.noiseControlMode == .unknown)
 
                 primaryModeButton(
                     title: "Transparency",
@@ -30,6 +31,7 @@ public struct NoiseControlCardView: View {
                 ) {
                     appState.setNoiseMode(.transparency)
                 }
+                .disabled(appState.noiseControlMode == .unknown)
 
                 primaryModeButton(
                     title: "Noise Cancelling",
@@ -40,6 +42,7 @@ public struct NoiseControlCardView: View {
                         appState.setNoiseMode(.anc(.smart))
                     }
                 }
+                .disabled(appState.noiseControlMode == .unknown)
             }
 
             // ANC Strength sub-levels (only shown when ANC is active)

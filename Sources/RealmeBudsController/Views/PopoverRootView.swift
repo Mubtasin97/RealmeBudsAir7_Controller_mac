@@ -23,21 +23,30 @@ public struct PopoverRootView: View {
                 Divider()
 
                 // Scrollable Content Area
-                ScrollView {
-                    VStack(spacing: 12) {
-                        switch appState.activeSection {
-                        case .overview:
-                            OverviewSectionView(appState: appState, onOpenSettings: onOpenSettingsWindow)
-                        case .devices:
-                            ConnectedDevicesSectionView(appState: appState)
-                        case .settings:
-                            inlineSettingsView
-                        case .diagnostics:
-                            DiagnosticsSectionView(appState: appState)
+                ZStack {
+                    contentBackground
+                        .ignoresSafeArea()
+
+                    ScrollView(showsIndicators: false) {
+                        VStack(spacing: 12) {
+                            switch appState.activeSection {
+                            case .overview:
+                                OverviewSectionView(appState: appState, onOpenSettings: onOpenSettingsWindow)
+                            case .devices:
+                                ConnectedDevicesSectionView(appState: appState)
+                            case .settings:
+                                inlineSettingsView
+                            case .diagnostics:
+                                DiagnosticsSectionView(appState: appState)
+                            }
                         }
+                        .frame(maxWidth: .infinity)
+                        .padding(14)
                     }
-                    .padding(14)
+                    .scrollClipDisabled(false)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 Divider()
 
@@ -49,6 +58,26 @@ public struct PopoverRootView: View {
         }
         .frame(width: 340, height: 500)
         .preferredColorScheme(appearanceManager.colorSchemeOverride)
+    }
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.colorSchemeContrast) private var colorSchemeContrast
+
+    @ViewBuilder
+    private var contentBackground: some View {
+        if reduceTransparency {
+            Rectangle()
+                .fill(colorScheme == .dark ? Color(nsColor: .windowBackgroundColor) : Color(nsColor: .controlBackgroundColor))
+        } else {
+            Rectangle()
+                .fill(.regularMaterial)
+                .overlay(
+                    Rectangle()
+                        .fill(colorScheme == .dark
+                              ? Color.black.opacity(0.10)
+                              : Color.white.opacity(0.10))
+                )
+        }
     }
 
     // MARK: - Header Bar
@@ -87,6 +116,7 @@ public struct PopoverRootView: View {
                     .overlay(Circle().strokeBorder(Color.white.opacity(0.1), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
+                .disabled(!appState.eqPresetKnown)
                 .help(appearanceManager.headerButtonTooltip)
 
                 // Quit Button
@@ -113,9 +143,26 @@ public struct PopoverRootView: View {
     }
 
     private var headerStatusText: String {
-        let connectedCount = appState.rememberedDevices.filter(\.isConnected).count
-        let linkText = appState.isConnected ? "Connected" : "Disconnected"
-        return "\(linkText) · \(connectedCount) device\(connectedCount == 1 ? "" : "s")"
+        let bluetooth = RealmeBluetoothService.shared
+        let audioText: String
+        if case .detected(_, _, let aclConnected) = bluetooth.earbudDetection {
+            audioText = aclConnected ? "Audio connected" : "Audio disconnected"
+        } else {
+            audioText = "Audio unknown"
+        }
+
+        let controlText: String
+        switch bluetooth.rfcommState {
+        case .connected(let channel, _):
+            controlText = "Control connected · Ch \(channel)"
+        case .connecting(let channel):
+            controlText = "Control connecting · Ch \(channel)"
+        case .failed:
+            controlText = "Control disconnected"
+        case .disconnecting, .disconnected:
+            controlText = "Control disconnected"
+        }
+        return "\(audioText) · \(controlText)"
     }
 
     @ViewBuilder
@@ -173,13 +220,13 @@ public struct PopoverRootView: View {
                     VStack(spacing: 4) {
                         ForEach(EqualizerPreset.allCases) { preset in
                             Button {
-                                appState.activeEqPreset = preset
+                                appState.setEQPreset(preset)
                             } label: {
                                 HStack(spacing: 8) {
                                     Image(systemName: preset.sfSymbol)
                                         .font(.system(size: 12))
                                         .frame(width: 18)
-                                        .foregroundStyle(appState.activeEqPreset == preset ? Theme.accent : .secondary)
+                                        .foregroundStyle(appState.eqPresetKnown && appState.activeEqPreset == preset ? Theme.accent : .secondary)
 
                                     VStack(alignment: .leading, spacing: 1) {
                                         Text(preset.title)
@@ -191,7 +238,7 @@ public struct PopoverRootView: View {
 
                                     Spacer()
 
-                                    if appState.activeEqPreset == preset {
+                                    if appState.eqPresetKnown && appState.activeEqPreset == preset {
                                         Image(systemName: "checkmark")
                                             .font(.system(size: 10, weight: .bold))
                                             .foregroundStyle(Theme.accent)
@@ -201,10 +248,11 @@ public struct PopoverRootView: View {
                                 .padding(.vertical, 5)
                                 .background(
                                     RoundedRectangle(cornerRadius: 6)
-                                        .fill(appState.activeEqPreset == preset ? Theme.accentSubtle : Color.clear)
+                                        .fill(appState.eqPresetKnown && appState.activeEqPreset == preset ? Theme.accentSubtle : Color.clear)
                                 )
                             }
                             .buttonStyle(.plain)
+                            .disabled(!appState.eqPresetKnown)
                         }
                     }
                 }
@@ -220,10 +268,15 @@ public struct PopoverRootView: View {
                         .controlSize(.small)
                         .tint(Theme.accent)
 
-                    Toggle("In-Ear Detection (Auto-Pause)", isOn: $appState.isInEarDetectionEnabled)
-                        .toggleStyle(.switch)
-                        .controlSize(.small)
-                        .tint(Theme.accent)
+                    HStack {
+                        Text(appState.isInEarDetectionKnown ? "In-Ear Detection" : "In-Ear Detection")
+                        Spacer()
+                        Text(appState.isInEarDetectionKnown
+                             ? (appState.isInEarDetectionEnabled ? "Enabled" : "Disabled")
+                             : "Unavailable")
+                            .foregroundStyle(.secondary)
+                    }
+                    .font(.system(size: 11))
 
                     Toggle("System Notifications", isOn: $appState.enableNotifications)
                         .toggleStyle(.switch)
@@ -259,7 +312,7 @@ public struct PopoverRootView: View {
                 Circle()
                     .fill(appState.isConnected ? Theme.success : Theme.error)
                     .frame(width: 6, height: 6)
-                Text(appState.isConnected ? "Online (Dual Connection)" : "Offline")
+                Text(appState.isConnected ? "Control connected" : "Control disconnected")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
             }

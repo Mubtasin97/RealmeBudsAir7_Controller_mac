@@ -41,7 +41,9 @@ public struct ConnectedDevicesSectionView: View {
                         HStack(spacing: 6) {
                             Text("Dual-Device Connection")
                                 .font(.system(size: 13, weight: .bold))
-                            Text(appState.isDualConnectionEnabled ? "ENABLED" : "DISABLED")
+                            Text(appState.dualDeviceKnown
+                                 ? (appState.isDualConnectionEnabled ? "ENABLED" : "DISABLED")
+                                 : "READING")
                                 .font(.system(size: 8, weight: .bold))
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 1.5)
@@ -51,14 +53,21 @@ public struct ConnectedDevicesSectionView: View {
                         Text("Connect 2 Bluetooth devices simultaneously")
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
+                        Text("Audio source switching is controlled by the earbuds")
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
                     }
 
                     Spacer()
 
-                    Toggle("", isOn: $appState.isDualConnectionEnabled)
+                    Toggle("", isOn: Binding(
+                        get: { appState.isDualConnectionEnabled },
+                        set: { RealmeBluetoothService.shared.setDualDeviceEnabled($0) }
+                    ))
                         .toggleStyle(.switch)
                         .controlSize(.small)
                         .tint(Theme.accent)
+                        .disabled(!appState.dualDeviceKnown)
                 }
             }
 
@@ -84,21 +93,51 @@ public struct ConnectedDevicesSectionView: View {
                         title: "Remembered Devices (\(inactiveDevices.count))",
                         icon: "clock.arrow.circlepath",
                         accessory: AnyView(
-                            Button {
-                                showingAddDeviceSheet = true
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "plus.circle.fill")
-                                    Text("Add Device")
+                            HStack(spacing: 8) {
+                                Button {
+                                    RealmeBluetoothService.shared.requestRememberedDevices()
+                                } label: {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundStyle(Theme.accent)
                                 }
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(Theme.accent)
+                                .buttonStyle(.plain)
+                                .disabled(appState.rememberedDevicesLoading)
+
+                                Button {
+                                    showingAddDeviceSheet = true
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "plus.circle.fill")
+                                        Text("Add Device")
+                                    }
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundStyle(Theme.accent)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         )
                     )
 
-                    if inactiveDevices.isEmpty {
+                    if appState.rememberedDevicesLoading && appState.rememberedDevices.isEmpty {
+                        Text("Reading remembered devices…")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, 8)
+                    } else if let error = appState.rememberedDevicesError {
+                        Text(error)
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.error)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 8)
+                    } else if inactiveDevices.isEmpty && appState.rememberedDevices.isEmpty {
+                        Text("No remembered devices received yet.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    } else if inactiveDevices.isEmpty {
                         Text("All paired devices are currently active in slots.")
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
@@ -116,6 +155,30 @@ public struct ConnectedDevicesSectionView: View {
         }
         .sheet(isPresented: $showingAddDeviceSheet) {
             AddDeviceSheetView()
+        }
+        .confirmationDialog(
+            "Replace connected device?",
+            isPresented: Binding(
+                get: { appState.pendingReplacementOld != nil && appState.pendingReplacementNew != nil },
+                set: { presented in
+                    if !presented {
+                        RealmeBluetoothService.shared.cancelReplaceRememberedDevice()
+                    }
+                }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Replace Device", role: .destructive) {
+                RealmeBluetoothService.shared.confirmReplaceRememberedDevice()
+            }
+            Button("Cancel", role: .cancel) {
+                RealmeBluetoothService.shared.cancelReplaceRememberedDevice()
+            }
+        } message: {
+            if let oldDevice = appState.pendingReplacementOld,
+               let newDevice = appState.pendingReplacementNew {
+                Text("Disconnect \(oldDevice.name) and connect \(newDevice.name)? This Mac will remain connected.")
+            }
         }
     }
 
@@ -171,7 +234,7 @@ public struct ConnectedDevicesSectionView: View {
                         Circle()
                             .fill(Theme.success)
                             .frame(width: 6, height: 6)
-                        Text("Active")
+                        Text("Connected link")
                             .font(.system(size: 10, weight: .medium))
                             .foregroundStyle(Theme.success)
                     }

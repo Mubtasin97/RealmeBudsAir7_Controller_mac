@@ -34,6 +34,7 @@ public final class AppearanceManager: ObservableObject {
     @Published public var currentPreference: AppAppearance {
         didSet {
             UserDefaults.standard.set(currentPreference.rawValue, forKey: defaultsKey)
+            ApplicationSupportPreferences.save(key: defaultsKey, value: currentPreference.rawValue)
             applyAppearance()
         }
     }
@@ -72,7 +73,10 @@ public final class AppearanceManager: ObservableObject {
     }
 
     private init() {
-        let savedRaw = UserDefaults.standard.string(forKey: defaultsKey) ?? AppAppearance.system.rawValue
+        let savedRaw = ApplicationSupportPreferences.load(
+            key: defaultsKey,
+            default: UserDefaults.standard.string(forKey: defaultsKey) ?? AppAppearance.system.rawValue
+        )
         self.currentPreference = AppAppearance(rawValue: savedRaw) ?? .system
         applyAppearance()
     }

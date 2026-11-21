@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusBarController: StatusBarController?
+    private var workspaceObservers: [NSObjectProtocol] = []
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
         // Enforce application-only appearance
@@ -31,6 +32,26 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.statusBarController?.showPopover()
             }
         }
+
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspaceObservers.append(workspace.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                RealmeBluetoothService.shared.handleSleep()
+            }
+        })
+        workspaceObservers.append(workspace.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            Task { @MainActor in
+                RealmeBluetoothService.shared.handleWake()
+            }
+        })
     }
 
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {

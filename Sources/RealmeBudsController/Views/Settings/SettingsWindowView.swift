@@ -161,6 +161,7 @@ public struct SettingsWindowView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(!appState.eqPresetKnown)
     }
 
     // MARK: - 2. Equalizer Tab
@@ -190,36 +191,47 @@ public struct SettingsWindowView: View {
                         .font(.system(size: 10, weight: .bold, design: .rounded))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text(appState.activeEqPreset.title)
+                    Text(appState.eqPresetKnown ? appState.activeEqPreset.title : "Loading…")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Theme.accent)
                 }
 
-                HStack(spacing: 12) {
-                    ForEach($appState.currentEqBands) { $band in
-                        VStack(spacing: 6) {
-                            Text(String(format: "%+.1f dB", band.gainDb))
-                                .font(.system(size: 8, weight: .bold, design: .monospaced))
-                                .foregroundStyle(band.gainDb != 0 ? Theme.accent : .secondary)
+                if appState.eqPresetKnown {
+                    HStack(spacing: 12) {
+                        ForEach($appState.currentEqBands) { $band in
+                            VStack(spacing: 6) {
+                                Text(String(format: "%+.1f dB", band.gainDb))
+                                    .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                    .foregroundStyle(band.gainDb != 0 ? Theme.accent : .secondary)
 
-                            // Vertical Slider
-                            Slider(value: $band.gainDb, in: -6.0...6.0, step: 0.5)
-                                .rotationEffect(.degrees(-90))
-                                .frame(width: 80, height: 32)
-                                .tint(Theme.accent)
+                                Slider(value: $band.gainDb, in: -6.0...6.0, step: 0.5)
+                                    .rotationEffect(.degrees(-90))
+                                    .frame(width: 80, height: 32)
+                                    .tint(Theme.accent)
 
-                            Text(band.frequencyLabel)
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(.primary)
+                                Text(band.frequencyLabel)
+                                    .font(.system(size: 9, weight: .semibold))
+                                    .foregroundStyle(.primary)
+                            }
+                            .frame(maxWidth: .infinity)
                         }
-                        .frame(maxWidth: .infinity)
                     }
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.primary.opacity(0.03))
+                    )
+                } else {
+                    Text(appState.audioLoading ? "Loading EQ preset…" : "EQ preset unavailable")
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 24)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.primary.opacity(0.03))
+                        )
                 }
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.primary.opacity(0.03))
-                )
             }
 
             Spacer()
@@ -228,10 +240,10 @@ public struct SettingsWindowView: View {
 
     @ViewBuilder
     private func eqPresetCard(preset: EqualizerPreset) -> some View {
-        let isSelected = appState.activeEqPreset == preset
+        let isSelected = appState.eqPresetKnown && appState.activeEqPreset == preset
         Button {
             withAnimation(Theme.quickAnimation) {
-                appState.activeEqPreset = preset
+                appState.setEQPreset(preset)
             }
         } label: {
             VStack(spacing: 4) {
@@ -254,6 +266,7 @@ public struct SettingsWindowView: View {
             )
         }
         .buttonStyle(.plain)
+        .disabled(!appState.eqPresetKnown)
     }
 
     // MARK: - 3. Connection Tab

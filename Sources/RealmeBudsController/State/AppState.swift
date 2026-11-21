@@ -1,5 +1,6 @@
 import SwiftUI
 import Combine
+import ServiceManagement
 
 public enum NavigationSection: String, CaseIterable, Identifiable, Sendable {
     case overview = "overview"
@@ -37,37 +38,46 @@ public final class AppState: ObservableObject {
 
     // MARK: - Device Info & Link Status
     @Published public var deviceName: String = "Realme Buds Air 7"
-    @Published public var deviceModelCode: String = "RMA2401"
-    @Published public var firmwareVersion: String = "1.1.0.66"
-    @Published public var hardwareRevision: String = "0x064812"
-    @Published public var bluetoothSoC: String = "Bestechnic BES2700YP"
+    @Published public var deviceModelCode: String = "Unavailable"
+    @Published public var firmwareVersion: String = "Unavailable"
+    @Published public var hardwareRevision: String = "Unavailable"
+    @Published public var bluetoothSoC: String = "Unavailable"
     @Published public var isConnected: Bool = false
     @Published public var rfcommChannel: Int = 15
     @Published public var rfcommServiceName: String = "oppointeraction"
     @Published public var serviceUUID: String = "0000079A-D102-11E1-9B23-00025B00A5A5"
     @Published public var linkStatusText: String = "Disconnected"
-    @Published public var rssi: Int = -52 // dBm
-    @Published public var activeCodec: String = "AAC-LC (48 kHz / 24-bit)"
+    @Published public var rssi: Int?
+    @Published public var activeCodec: String = "Unavailable"
     @Published public var txPacketsCount: Int = 0
     @Published public var rxPacketsCount: Int = 0
     @Published public var packetDropCount: Int = 0
 
     // MARK: - Battery Telemetry
-    @Published public var leftBattery: BatteryStatus = BatteryStatus(percentage: 85, isCharging: false)
-    @Published public var rightBattery: BatteryStatus = BatteryStatus(percentage: 90, isCharging: false)
-    @Published public var caseBattery: BatteryStatus = BatteryStatus(percentage: 65, isCharging: true)
+    @Published public var leftBattery: BatteryStatus = BatteryStatus()
+    @Published public var rightBattery: BatteryStatus = BatteryStatus()
+    @Published public var caseBattery: BatteryStatus = BatteryStatus()
+    @Published public var batteryLoading: Bool = false
+    @Published public var batteryError: String?
 
     // MARK: - Noise Control
-    @Published public var noiseControlMode: NoiseControlMode = .anc(.smart)
+    @Published public var noiseControlMode: NoiseControlMode = .unknown
 
     // MARK: - Quick Hardware Switches
     @Published public var isGameModeEnabled: Bool = false
-    @Published public var isHiResLhdcEnabled: Bool = true
-    @Published public var isDualConnectionEnabled: Bool = true
-    @Published public var isSpatialAudioEnabled: Bool = true
-    @Published public var isInEarDetectionEnabled: Bool = true
-    @Published public var isWindNoiseReductionEnabled: Bool = true
-    @Published public var isDynamicBassEnabled: Bool = true
+    @Published public var isHiResLhdcEnabled: Bool = false
+    @Published public var isDualConnectionEnabled: Bool = false
+    @Published public var isSpatialAudioEnabled: Bool = false
+    @Published public var gameModeKnown: Bool = false
+    @Published public var lhdcKnown: Bool = false
+    @Published public var spatialAudioKnown: Bool = false
+    @Published public var eqPresetKnown: Bool = false
+    @Published public var isInEarDetectionEnabled: Bool = false
+    @Published public var isInEarDetectionKnown: Bool = false
+    @Published public var isWindNoiseReductionEnabled: Bool = false
+    @Published public var isDynamicBassEnabled: Bool = false
+    @Published public var audioLoading: Bool = false
+    @Published public var audioError: String?
 
     // MARK: - Equalizer
     @Published public var activeEqPreset: EqualizerPreset = .original {
@@ -78,60 +88,60 @@ public final class AppState: ObservableObject {
     @Published public var currentEqBands: [EqualizerBand] = EqualizerPreset.original.defaultBands
 
     // MARK: - Connected & Remembered Devices (Dual Connection)
-    @Published public var rememberedDevices: [PairedDevice] = [
-        PairedDevice(
-            name: "MacBook Pro (This Mac)",
-            macAddress: "F4:D4:88:AA:11:01",
-            connectionState: .connected,
-            slotNumber: 1,
-            isThisMac: true,
-            iconName: "laptopcomputer",
-            lastConnectedTime: "Primary Host (Active)"
-        ),
-        PairedDevice(
-            name: "Protik's iPhone 16 Pro",
-            macAddress: "DC:A9:04:88:33:22",
-            connectionState: .connected,
-            slotNumber: 2,
-            isThisMac: false,
-            iconName: "iphone",
-            lastConnectedTime: "Secondary Host (Active)"
-        ),
-        PairedDevice(
-            name: "iPad Air 5",
-            macAddress: "A0:C9:A0:55:77:88",
-            connectionState: .disconnected,
-            slotNumber: nil,
-            isThisMac: false,
-            iconName: "ipad",
-            lastConnectedTime: "Yesterday at 18:42"
-        ),
-        PairedDevice(
-            name: "ThinkPad X1 Carbon",
-            macAddress: "50:EB:71:34:99:A0",
-            connectionState: .disconnected,
-            slotNumber: nil,
-            isThisMac: false,
-            iconName: "desktopcomputer",
-            lastConnectedTime: "3 days ago"
-        )
-    ]
+    @Published public var rememberedDevices: [PairedDevice] = []
+    @Published public var rememberedDevicesLoading: Bool = false
+    @Published public var rememberedDevicesError: String?
+    @Published public var dualDeviceKnown: Bool = false
+    @Published public var pendingReplacementOld: PairedDevice?
+    @Published public var pendingReplacementNew: PairedDevice?
 
     // MARK: - Settings: Preferences
-    @Published public var autoConnectOnLaunch: Bool = true
-    @Published public var autoReconnectOnDisconnect: Bool = true
-    @Published public var launchAtLogin: Bool = false
+    @Published public var autoConnectOnLaunch: Bool = true {
+        didSet { ApplicationSupportPreferences.save(key: "autoConnectOnLaunch", value: autoConnectOnLaunch) }
+    }
+    @Published public var autoReconnectOnDisconnect: Bool = true {
+        didSet { ApplicationSupportPreferences.save(key: "autoReconnectOnDisconnect", value: autoReconnectOnDisconnect) }
+    }
+    @Published public var launchAtLogin: Bool = false {
+        didSet {
+            ApplicationSupportPreferences.save(key: "launchAtLogin", value: launchAtLogin)
+            do {
+                if launchAtLogin {
+                    try SMAppService.mainApp.register()
+                } else {
+                    try SMAppService.mainApp.unregister()
+                }
+            } catch {
+                appendLog(level: .error, category: "LOGIN_ITEM", message: "Could not update launch at login: \(error.localizedDescription)")
+            }
+        }
+    }
 
     // Settings: Notifications
-    @Published public var enableNotifications: Bool = true
-    @Published public var notifyLowBattery: Bool = true
-    @Published public var notifyDeviceSwitched: Bool = true
-    @Published public var notifyChargingCompleted: Bool = false
+    @Published public var enableNotifications: Bool = true {
+        didSet { ApplicationSupportPreferences.save(key: "enableNotifications", value: enableNotifications) }
+    }
+    @Published public var notifyLowBattery: Bool = true {
+        didSet { ApplicationSupportPreferences.save(key: "notifyLowBattery", value: notifyLowBattery) }
+    }
+    @Published public var notifyDeviceSwitched: Bool = true {
+        didSet { ApplicationSupportPreferences.save(key: "notifyDeviceSwitched", value: notifyDeviceSwitched) }
+    }
+    @Published public var notifyChargingCompleted: Bool = false {
+        didSet { ApplicationSupportPreferences.save(key: "notifyChargingCompleted", value: notifyChargingCompleted) }
+    }
 
     // MARK: - Diagnostics Telemetry Log
     @Published public var diagnosticLogs: [DiagnosticEntry] = []
 
     private init() {
+        autoConnectOnLaunch = ApplicationSupportPreferences.load(key: "autoConnectOnLaunch", default: true)
+        autoReconnectOnDisconnect = ApplicationSupportPreferences.load(key: "autoReconnectOnDisconnect", default: true)
+        launchAtLogin = ApplicationSupportPreferences.load(key: "launchAtLogin", default: SMAppService.mainApp.status == .enabled)
+        enableNotifications = ApplicationSupportPreferences.load(key: "enableNotifications", default: true)
+        notifyLowBattery = ApplicationSupportPreferences.load(key: "notifyLowBattery", default: true)
+        notifyDeviceSwitched = ApplicationSupportPreferences.load(key: "notifyDeviceSwitched", default: true)
+        notifyChargingCompleted = ApplicationSupportPreferences.load(key: "notifyChargingCompleted", default: false)
         populateInitialDiagnosticLogs()
     }
 
@@ -148,88 +158,40 @@ public final class AppState: ObservableObject {
     // MARK: - Actions
 
     public func setNoiseMode(_ mode: NoiseControlMode) {
-        withAnimation(Theme.quickAnimation) {
-            noiseControlMode = mode
-        }
-        appendLog(
-            level: .tx,
-            category: "ANC",
-            message: "Noise control command 0x0404 dispatched: \(mode.title)"
-        )
+        RealmeBluetoothService.shared.setNoiseMode(mode)
     }
 
     public func toggleGameMode() {
-        withAnimation(Theme.quickAnimation) {
-            isGameModeEnabled.toggle()
-        }
-        appendLog(
-            level: .tx,
-            category: "GAME_MODE",
-            message: "Game mode 0x0403 [0x06] updated to \(isGameModeEnabled ? "ENABLED (45ms)" : "DISABLED")"
-        )
+        RealmeBluetoothService.shared.setGameMode(!isGameModeEnabled)
     }
 
     public func toggleLhdc() {
-        withAnimation(Theme.quickAnimation) {
-            isHiResLhdcEnabled.toggle()
-        }
-        appendLog(
-            level: .tx,
-            category: "LHDC",
-            message: "High-Res audio switch 0x0403 [0x18] updated to \(isHiResLhdcEnabled ? "ENABLED" : "DISABLED")"
-        )
+        RealmeBluetoothService.shared.setLHDC(!isHiResLhdcEnabled)
+    }
+
+    public func setEQPreset(_ preset: EqualizerPreset) {
+        RealmeBluetoothService.shared.setEQPreset(preset)
+    }
+
+    public func toggleSpatialAudio() {
+        RealmeBluetoothService.shared.setSpatialAudio(!isSpatialAudioEnabled)
     }
 
     public func toggleDeviceConnection(for device: PairedDevice) {
-        guard let index = rememberedDevices.firstIndex(where: { $0.id == device.id }) else { return }
-
-        let activeCount = rememberedDevices.filter(\.isConnected).count
-        if !device.isConnected && activeCount >= 2 {
-            appendLog(
-                level: .warn,
-                category: "MULTI_CONNECT",
-                message: "Multi-connect limit: Both hardware slots are occupied. Pick a device to disconnect first."
-            )
+        guard !device.isThisMac else {
+            appendLog(level: .warn, category: "MULTI_CONNECT", message: "This Mac cannot be disconnected by the controller.")
             return
         }
-
-        withAnimation(Theme.quickAnimation) {
-            if rememberedDevices[index].isConnected {
-                rememberedDevices[index].connectionState = .disconnected
-                rememberedDevices[index].slotNumber = nil
-            } else {
-                rememberedDevices[index].connectionState = .connected
-                let takenSlots = Set(rememberedDevices.compactMap(\.slotNumber))
-                rememberedDevices[index].slotNumber = takenSlots.contains(1) ? 2 : 1
-            }
+        if device.isConnected {
+            RealmeBluetoothService.shared.disconnectRememberedDevice(device)
+        } else {
+            RealmeBluetoothService.shared.connectRememberedDevice(device)
         }
-
-        appendLog(
-            level: .tx,
-            category: "MULTI_CONNECT",
-            message: "0x040B operateMultiConnect sent for '\(device.name)': \(rememberedDevices[index].connectionState.rawValue)"
-        )
     }
 
     public func swapDevice(disconnecting oldDevice: PairedDevice, connecting newDevice: PairedDevice) {
-        guard let oldIdx = rememberedDevices.firstIndex(where: { $0.id == oldDevice.id }),
-              let newIdx = rememberedDevices.firstIndex(where: { $0.id == newDevice.id }) else { return }
-
-        let slot = rememberedDevices[oldIdx].slotNumber ?? 2
-
-        withAnimation(Theme.quickAnimation) {
-            rememberedDevices[oldIdx].connectionState = .disconnected
-            rememberedDevices[oldIdx].slotNumber = nil
-
-            rememberedDevices[newIdx].connectionState = .connected
-            rememberedDevices[newIdx].slotNumber = slot
-        }
-
-        appendLog(
-            level: .tx,
-            category: "MULTI_CONNECT",
-            message: "Swapped Slot \(slot): Disconnected '\(oldDevice.name)', connected '\(newDevice.name)'"
-        )
+        guard !oldDevice.isThisMac, !newDevice.isThisMac else { return }
+        RealmeBluetoothService.shared.requestReplaceRememberedDevice(oldDevice, with: newDevice)
     }
 
     public func appendLog(level: DiagnosticLevel, category: String, message: String, hexData: String? = nil) {

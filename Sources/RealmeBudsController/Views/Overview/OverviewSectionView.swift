@@ -30,16 +30,29 @@ public struct OverviewSectionView: View {
                         ) {
                             appState.toggleGameMode()
                         }
+                        .disabled(!appState.gameModeKnown)
 
                         featureToggleRow(
                             title: "LHDC Audio Preference",
-                            subtitle: "Request 24-bit / 96 kHz high-res profile",
+                            subtitle: "Earbud preference · macOS uses AAC/SBC",
                             icon: "hifispeaker.fill",
                             isOn: appState.isHiResLhdcEnabled,
                             activeBadge: "Hi-Res"
                         ) {
                             appState.toggleLhdc()
                         }
+                        .disabled(!appState.lhdcKnown)
+
+                        featureToggleRow(
+                            title: "Spatial Audio",
+                            subtitle: "Use the verified spatial-audio switch",
+                            icon: "arkit",
+                            isOn: appState.isSpatialAudioEnabled,
+                            activeBadge: "Spatial"
+                        ) {
+                            appState.toggleSpatialAudio()
+                        }
+                        .disabled(!appState.spatialAudioKnown)
                     }
                 }
             }
@@ -54,7 +67,7 @@ public struct OverviewSectionView: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 142)
+                        .frame(height: 112)
                         .padding(.horizontal, 8)
 
                     caseBatteryBadge
@@ -86,7 +99,7 @@ public struct OverviewSectionView: View {
             productImage(imageName)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
-                .frame(width: 82, height: 88)
+                .frame(width: 58, height: 62)
 
             VStack(spacing: 3) {
                 Text(title)
@@ -95,7 +108,7 @@ public struct OverviewSectionView: View {
 
                 batteryBadge(status: status)
 
-                Text(status.isCharging ? "Charging" : "Wear status unavailable")
+                Text(status.isCharging ? "Charging" : (appState.batteryLoading && status.percentage == nil ? "Updating…" : (appState.batteryError != nil && status.percentage == nil ? "Unavailable" : "Wear status unavailable")))
                     .font(.system(size: 8, weight: .medium))
                     .foregroundStyle(status.isCharging ? Theme.batteryCharging : .secondary)
                     .lineLimit(1)
@@ -107,7 +120,11 @@ public struct OverviewSectionView: View {
     private var caseBatteryBadge: some View {
         VStack(alignment: .trailing, spacing: 3) {
             batteryBadge(status: appState.caseBattery)
-            Text(appState.caseBattery.isCharging ? "Charging" : "Case")
+            Text(appState.caseBattery.isCharging
+                 ? "Charging"
+                 : (appState.batteryLoading && appState.caseBattery.percentage == nil
+                    ? "Updating…"
+                    : (appState.batteryError != nil && appState.caseBattery.percentage == nil ? "Unavailable" : "Case")))
                 .font(.system(size: 8, weight: .semibold))
                 .foregroundStyle(appState.caseBattery.isCharging ? Theme.batteryCharging : .secondary)
         }
@@ -159,7 +176,7 @@ public struct OverviewSectionView: View {
         if let url, let nsImage = NSImage(contentsOf: url) {
             return Image(nsImage: nsImage)
         }
-        return Image(systemName: "headphones")
+        return Image(systemName: "rectangle.dashed")
     }
 
     @ViewBuilder

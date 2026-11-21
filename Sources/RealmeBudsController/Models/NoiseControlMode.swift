@@ -28,12 +28,14 @@ public enum ANCStrength: UInt8, CaseIterable, Identifiable, Sendable {
 }
 
 public enum NoiseControlMode: Equatable, Identifiable, Sendable {
+    case unknown
     case off
     case transparency
     case anc(ANCStrength)
 
     public var id: String {
         switch self {
+        case .unknown: "unknown"
         case .off: "off"
         case .transparency: "transparency"
         case .anc(let strength): "anc_\(strength.rawValue)"
@@ -42,6 +44,7 @@ public enum NoiseControlMode: Equatable, Identifiable, Sendable {
 
     public var title: String {
         switch self {
+        case .unknown: "Unknown"
         case .off: "Off"
         case .transparency: "Transparency"
         case .anc(let strength): "ANC (\(strength.title))"
@@ -50,6 +53,7 @@ public enum NoiseControlMode: Equatable, Identifiable, Sendable {
 
     public var baseModeName: String {
         switch self {
+        case .unknown: "Unknown"
         case .off: "Off"
         case .transparency: "Transparency"
         case .anc: "Noise Cancelling"
@@ -58,6 +62,7 @@ public enum NoiseControlMode: Equatable, Identifiable, Sendable {
 
     public var sfSymbol: String {
         switch self {
+        case .unknown: "questionmark.circle"
         case .off: "circle.slash"
         case .transparency: "ear.and.waveform"
         case .anc: "waveform.slash"
