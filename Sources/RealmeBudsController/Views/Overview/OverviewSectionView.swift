@@ -1,77 +1,18 @@
+import AppKit
 import SwiftUI
 
 public struct OverviewSectionView: View {
     @ObservedObject var appState: AppState
     public let onOpenSettings: () -> Void
 
-    @Environment(\.colorScheme) private var colorScheme
-
     public var body: some View {
         VStack(spacing: 12) {
-            // Header Device Status Card
-            LiquidGlassCard {
-                HStack(spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(Theme.accentSubtle)
-                            .frame(width: 40, height: 40)
-                        Image(systemName: "headphones")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(Theme.accent)
-                    }
+            productBatterySection
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(appState.deviceName)
-                            .font(.system(size: 14, weight: .bold))
-                            .foregroundStyle(.primary)
-
-                        HStack(spacing: 5) {
-                            Circle()
-                                .fill(appState.isConnected ? Theme.success : Theme.error)
-                                .frame(width: 6, height: 6)
-                            Text(appState.linkStatusText)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-
-                    Spacer()
-
-                    // Quick Settings Button
-                    Button(action: onOpenSettings) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(7)
-                            .background(Circle().fill(Color.primary.opacity(0.06)))
-                    }
-                    .buttonStyle(.plain)
-                    .help("Open Settings Window")
-                }
-            }
-
-            // Granular Battery Indicators (L / R / Case)
-            LiquidGlassCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    LiquidGlassSectionHeader(
-                        title: "Battery Indicators",
-                        icon: "battery.100.bolt"
-                    )
-
-                    HStack(spacing: 8) {
-                        BatteryCardView(slot: .left, status: appState.leftBattery)
-                        BatteryCardView(slot: .right, status: appState.rightBattery)
-                        BatteryCardView(slot: .caseEnclosure, status: appState.caseBattery)
-                    }
-                }
-            }
-
-            // Noise Control & Strength
             LiquidGlassCard {
                 NoiseControlCardView(appState: appState)
             }
 
-            // Game Mode & LHDC Preference Cards
             LiquidGlassCard {
                 VStack(alignment: .leading, spacing: 10) {
                     LiquidGlassSectionHeader(
@@ -80,7 +21,6 @@ public struct OverviewSectionView: View {
                     )
 
                     VStack(spacing: 8) {
-                        // Game Mode (Low Latency)
                         featureToggleRow(
                             title: "Game Mode",
                             subtitle: "Ultra-low 45ms audio latency",
@@ -91,7 +31,6 @@ public struct OverviewSectionView: View {
                             appState.toggleGameMode()
                         }
 
-                        // LHDC Preference (High-Res Audio)
                         featureToggleRow(
                             title: "LHDC Audio Preference",
                             subtitle: "Request 24-bit / 96 kHz high-res profile",
@@ -105,6 +44,122 @@ public struct OverviewSectionView: View {
                 }
             }
         }
+    }
+
+    private var productBatterySection: some View {
+        LiquidGlassCard {
+            VStack(spacing: 6) {
+                ZStack(alignment: .topTrailing) {
+                    productImage("BudsAir7CaseOpen")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 142)
+                        .padding(.horizontal, 8)
+
+                    caseBatteryBadge
+                        .padding(.top, 4)
+                        .padding(.trailing, 4)
+                }
+
+                HStack(alignment: .top, spacing: 14) {
+                    budBatteryView(
+                        title: "Left",
+                        imageName: "BudsAir7Left",
+                        status: appState.leftBattery
+                    )
+
+                    budBatteryView(
+                        title: "Right",
+                        imageName: "BudsAir7Right",
+                        status: appState.rightBattery
+                    )
+                }
+                .padding(.horizontal, 4)
+                .padding(.bottom, 2)
+            }
+        }
+    }
+
+    private func budBatteryView(title: String, imageName: String, status: BatteryStatus) -> some View {
+        VStack(spacing: 5) {
+            productImage(imageName)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: 82, height: 88)
+
+            VStack(spacing: 3) {
+                Text(title)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                batteryBadge(status: status)
+
+                Text(status.isCharging ? "Charging" : "Wear status unavailable")
+                    .font(.system(size: 8, weight: .medium))
+                    .foregroundStyle(status.isCharging ? Theme.batteryCharging : .secondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private var caseBatteryBadge: some View {
+        VStack(alignment: .trailing, spacing: 3) {
+            batteryBadge(status: appState.caseBattery)
+            Text(appState.caseBattery.isCharging ? "Charging" : "Case")
+                .font(.system(size: 8, weight: .semibold))
+                .foregroundStyle(appState.caseBattery.isCharging ? Theme.batteryCharging : .secondary)
+        }
+        .padding(7)
+        .background(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .fill(.thinMaterial)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func batteryBadge(status: BatteryStatus) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: status.isCharging ? "bolt.fill" : "battery.100")
+                .font(.system(size: 8, weight: .bold))
+                .foregroundStyle(status.isCharging ? Theme.batteryCharging : batteryColor(for: status.percentage))
+
+            Text(status.formattedText)
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(
+            Capsule(style: .continuous)
+                .fill(status.isCharging ? Theme.batteryCharging.opacity(0.12) : Color.primary.opacity(0.06))
+        )
+        .overlay(
+            Capsule(style: .continuous)
+                .strokeBorder(status.isCharging ? Theme.batteryCharging.opacity(0.28) : Color.primary.opacity(0.08), lineWidth: 1)
+        )
+    }
+
+    private func batteryColor(for percentage: Int?) -> Color {
+        guard let percentage else { return .secondary }
+        if percentage <= 20 { return Theme.batteryLow }
+        if percentage <= 40 { return Theme.warning }
+        return Theme.accent
+    }
+
+    private func productImage(_ name: String) -> Image {
+        let url = Bundle.main.url(forResource: name, withExtension: "png")
+            ?? Bundle.module.url(forResource: name, withExtension: "png")
+        if let url, let nsImage = NSImage(contentsOf: url) {
+            return Image(nsImage: nsImage)
+        }
+        return Image(systemName: "headphones")
     }
 
     @ViewBuilder
@@ -150,7 +205,6 @@ public struct OverviewSectionView: View {
 
                 Spacer()
 
-                // Native iOS/macOS style mini toggle pill
                 ZStack(alignment: isOn ? .trailing : .leading) {
                     Capsule()
                         .fill(isOn ? Theme.accent : Color.primary.opacity(0.12))

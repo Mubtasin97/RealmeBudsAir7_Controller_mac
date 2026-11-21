@@ -21,6 +21,9 @@ mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
 
 cp "$BIN_PATH" "$MACOS_DIR/RealmeBudsController"
 cp Resources/Info.plist "$CONTENTS_DIR/Info.plist"
+cp Sources/RealmeBudsController/Resources/BudsAir7CaseOpen.png "$RESOURCES_DIR/BudsAir7CaseOpen.png"
+cp Sources/RealmeBudsController/Resources/BudsAir7Left.png "$RESOURCES_DIR/BudsAir7Left.png"
+cp Sources/RealmeBudsController/Resources/BudsAir7Right.png "$RESOURCES_DIR/BudsAir7Right.png"
 
 echo "==> Ad-hoc signing app bundle with stable identifier..."
 codesign --force --sign - \

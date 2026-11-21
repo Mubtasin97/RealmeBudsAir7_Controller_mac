@@ -16,6 +16,9 @@ let package = Package(
         .executableTarget(
             name: "RealmeBudsController",
             path: "Sources/RealmeBudsController",
+            resources: [
+                .process("Resources")
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

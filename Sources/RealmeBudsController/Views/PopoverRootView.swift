@@ -59,9 +59,14 @@ public struct PopoverRootView: View {
                     Image(systemName: "headphones")
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(Theme.accent)
-                    Text("Realme Buds")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(.primary)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Realme Buds Air 7")
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(.primary)
+                        Text(headerStatusText)
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Spacer()
@@ -105,6 +110,12 @@ public struct PopoverRootView: View {
                 }
             }
         }
+    }
+
+    private var headerStatusText: String {
+        let connectedCount = appState.rememberedDevices.filter(\.isConnected).count
+        let linkText = appState.isConnected ? "Connected" : "Disconnected"
+        return "\(linkText) · \(connectedCount) device\(connectedCount == 1 ? "" : "s")"
     }
 
     @ViewBuilder
